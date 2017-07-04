@@ -8,12 +8,14 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 )
 
 const (
 	dcardAPIBase   string = "https://www.dcard.tw/_api/"
 	dcardAPIForums string = dcardAPIBase + "forums"
+	dcardAPIPost   string = dcardAPIBase + "posts"
 )
 
 var (
@@ -55,7 +57,7 @@ func getForums() string {
 	return forum[forumID].Alias
 }
 
-func getPostMeta(firstID int, lastID int) (int, int) {
+func getPostMeta(firstID int, lastID int) (int, int, PostMeta) {
 	var postMeta PostMeta
 	url := dcardAPIPostMeta
 
@@ -82,8 +84,8 @@ func getPostMeta(firstID int, lastID int) (int, int) {
 		log.Fatalln(err)
 	}
 
-	for _, v := range postMeta {
-		fmt.Printf("[%v](%v) -> %v: %v\n", v.ID, v.CreatedAt, len(v.Media), v.Title)
+	for k, v := range postMeta {
+		fmt.Printf("[%v](%v) -> %v: %v\n", k, v.CreatedAt, len(v.Media), v.Title)
 
 		if firstID == 0 {
 			firstID = v.ID
@@ -92,12 +94,38 @@ func getPostMeta(firstID int, lastID int) (int, int) {
 		lastID = v.ID
 	}
 
-	return firstID, lastID
+	return firstID, lastID, postMeta
+}
+
+func getPost(postID int) {
+	var post Post
+	url := fmt.Sprintf("%s/%d", dcardAPIPost, postID)
+
+	resp, err := http.Get(url)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		log.Fatalln(err)
+		log.Fatalln(resp.Status)
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	if err := json.Unmarshal([]byte(body), &post); err != nil {
+		log.Fatalln(err)
+	}
+
+	fmt.Println("========================================")
+	fmt.Printf("Title: %v\n", post.Title)
+	fmt.Println("========================================")
+	fmt.Printf("Content: \n%v\n", post.Content)
+	fmt.Println("========================================")
 }
 
 func main() {
 	currForum := getForums()
-	firstID, lastID := getPostMeta(0, 0)
+	firstID, lastID, postMeta := getPostMeta(0, 0)
 
 	scanner := bufio.NewScanner(os.Stdin)
 	quit := false
@@ -121,15 +149,31 @@ func main() {
 		case "f":
 			fmt.Println("Change forum")
 			currForum = getForums()
-			firstID, lastID = getPostMeta(0, 0)
+			firstID, lastID, postMeta = getPostMeta(0, 0)
 		case "n":
 			fmt.Println("Next Page")
-			firstID, lastID = getPostMeta(0, lastID)
+			firstID, lastID, postMeta = getPostMeta(0, lastID)
 		case "p":
 			fmt.Println("Previous Page")
-			firstID, lastID = getPostMeta(firstID, 0)
+			firstID, lastID, postMeta = getPostMeta(firstID, 0)
 		case "v":
-			fmt.Println("View Post")
+			if len(args) == 0 {
+				fmt.Println("No post specified. Try input 'v 1' to view article")
+				continue
+			}
+
+			i, err := strconv.Atoi(args[0])
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+
+			if i > len(postMeta) || i < 0 {
+				fmt.Println("Not a valid post ID. Try input 'v 1' to view article")
+				continue
+			}
+
+			getPost(postMeta[i].ID)
 		case "d":
 			if len(args) == 0 {
 				fmt.Println("No post specified. Try input 'd 1' to get media file")
