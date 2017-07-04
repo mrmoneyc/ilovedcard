@@ -12,22 +12,57 @@ import (
 )
 
 const (
-	dcardAPIBase    string = "https://www.dcard.tw/_api/"
-	dcardAPISexPost string = dcardAPIBase + "/forums/sex/posts?popular=false"
+	dcardAPIBase   string = "https://www.dcard.tw/_api/"
+	dcardAPIForums string = dcardAPIBase + "forums"
 )
 
 var (
-	currForum string
+	dcardAPIPostMeta string
+	currForum        string
 )
 
-func getArticle(firstID int, lastID int) (int, int) {
-	var article Articles
-	url := dcardAPISexPost
+func getForums() string {
+	var forum Forums
+
+	resp, err := http.Get(dcardAPIForums)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		log.Fatalln(err)
+		log.Fatalln(resp.Status)
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	if err := json.Unmarshal([]byte(body), &forum); err != nil {
+		log.Fatalln(err)
+	}
+
+	for k, v := range forum {
+		fmt.Printf("[%v] %v (%v)\n", k, v.Name, v.Alias)
+	}
+
+	fmt.Print("Enter forum ID: ")
+	var forumID int
+	fmt.Scan(&forumID)
+	if forumID > len(forum) {
+		log.Fatalln("Forum not found.")
+	}
+
+	dcardAPIPostMeta = fmt.Sprintf("%sforums/%s/posts?popular=%v", dcardAPIBase, forum[forumID].Alias, false)
+
+	return forum[forumID].Alias
+}
+
+func getPostMeta(firstID int, lastID int) (int, int) {
+	var postMeta PostMeta
+	url := dcardAPIPostMeta
 
 	if firstID != 0 {
-		url = fmt.Sprintf("%s&after=%d", dcardAPISexPost, firstID)
+		url = fmt.Sprintf("%s&after=%d", dcardAPIPostMeta, firstID)
 	} else if lastID != 0 {
-		url = fmt.Sprintf("%s&before=%d", dcardAPISexPost, lastID)
+		url = fmt.Sprintf("%s&before=%d", dcardAPIPostMeta, lastID)
 	}
 
 	firstID = 0
@@ -43,11 +78,11 @@ func getArticle(firstID int, lastID int) (int, int) {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	if err := json.Unmarshal([]byte(body), &article); err != nil {
+	if err := json.Unmarshal([]byte(body), &postMeta); err != nil {
 		log.Fatalln(err)
 	}
 
-	for _, v := range article {
+	for _, v := range postMeta {
 		fmt.Printf("[%v](%v) -> %v: %v\n", v.ID, v.CreatedAt, len(v.Media), v.Title)
 
 		if firstID == 0 {
@@ -61,16 +96,14 @@ func getArticle(firstID int, lastID int) (int, int) {
 }
 
 func main() {
-	currForum = "sex"
-	log.Printf("Forum: %v, URL: %v\n", currForum, dcardAPISexPost)
-
-	firstID, lastID := getArticle(0, 0)
+	currForum := getForums()
+	firstID, lastID := getPostMeta(0, 0)
 
 	scanner := bufio.NewScanner(os.Stdin)
 	quit := false
 
 	for !quit {
-		fmt.Println("n: Next, p: Previous, v: View, d: Download, q/quit/exit: Quit")
+		fmt.Println("n: Next, p: Previous, v: View, d: Download, f: Change forum, q/quit/exit: Quit")
 		fmt.Printf("Dcard:%v> ", currForum)
 
 		if !scanner.Scan() {
@@ -85,21 +118,25 @@ func main() {
 		switch cmd {
 		case "q", "quit", "exit":
 			quit = true
+		case "f":
+			fmt.Println("Change forum")
+			currForum = getForums()
+			firstID, lastID = getPostMeta(0, 0)
 		case "n":
 			fmt.Println("Next Page")
-			firstID, lastID = getArticle(0, lastID)
+			firstID, lastID = getPostMeta(0, lastID)
 		case "p":
 			fmt.Println("Previous Page")
-			firstID, lastID = getArticle(firstID, 0)
+			firstID, lastID = getPostMeta(firstID, 0)
 		case "v":
-			fmt.Println("View Article")
+			fmt.Println("View Post")
 		case "d":
 			if len(args) == 0 {
-				fmt.Println("No article specified. Try input 'd 1' to get media file")
+				fmt.Println("No post specified. Try input 'd 1' to get media file")
 				continue
 			}
 
-			fmt.Printf("Download article media: %v\n", args)
+			fmt.Printf("Download post media: %v\n", args)
 		}
 	}
 }

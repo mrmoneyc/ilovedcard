@@ -1,7 +1,32 @@
 package main
 
-// Articles is mapping to forum posts
-type Articles []struct {
+// Forums response data structure
+type Forums []struct {
+	ID                string `json:"id"`
+	Alias             string `json:"alias"`
+	Name              string `json:"name"`
+	Description       string `json:"description"`
+	SubscriptionCount int    `json:"subscriptionCount"`
+	Subscribed        bool   `json:"subscribed"`
+	Read              bool   `json:"read"`
+	CreatedAt         string `json:"createdAt"`
+	UpdatedAt         string `json:"updatedAt"`
+	CanPost           bool   `json:"canPost"`
+	IgnorePost        bool   `json:"ignorePost"`
+	Invisible         bool   `json:"invisible"`
+	IsSchool          bool   `json:"isSchool"`
+	FullyAnonymous    bool   `json:"fullyAnonymous"`
+	CanUseNickname    bool   `json:"canUseNickname"`
+	PostThumbnail     struct {
+		Size string `json:"size"`
+	} `json:"postThumbnail"`
+	ShouldCategorized bool     `json:"shouldCategorized"`
+	TitlePlaceholder  string   `json:"titlePlaceholder"`
+	Subcategories     []string `json:"subcategories"`
+}
+
+// PostMeta response data structure
+type PostMeta []struct {
 	ID                  int      `json:"id"`
 	Title               string   `json:"title"`
 	Excerpt             string   `json:"excerpt"`
