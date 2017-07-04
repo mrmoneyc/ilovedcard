@@ -62,8 +62,8 @@ func getForums() string {
 	return forum[forumID].Alias
 }
 
-func getPostMeta(firstID int, lastID int) (int, int, PostMetas) {
-	var postMeta PostMetas
+func getPostMeta(firstID int, lastID int) (int, int, []PostMeta) {
+	var postMeta []PostMeta
 	url := dcardAPIPostMeta
 
 	if firstID != 0 {
