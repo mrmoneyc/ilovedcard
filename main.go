@@ -2,17 +2,59 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"log"
+	"net/http"
 	"os"
 	"strings"
 )
 
+const (
+	dcardAPIBase    string = "https://www.dcard.tw/_api/"
+	dcardAPISexPost string = dcardAPIBase + "/forums/sex/posts?popular=false"
+)
+
+var (
+	currForum string
+)
+
+func getArticle() {
+	var article Articles
+
+	resp, err := http.Get(dcardAPISexPost)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		log.Fatalln(err)
+		log.Fatalln(resp.Status)
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	if err := json.Unmarshal([]byte(body), &article); err != nil {
+		log.Fatalln(err)
+	}
+
+	for _, v := range article {
+		fmt.Printf("[%v](%v) -> %v: %v\n", v.ID, v.CreatedAt, len(v.Media), v.Title)
+	}
+}
+
 func main() {
+	currForum = "sex"
+	log.Printf("Forum: %v, URL: %v\n", currForum, dcardAPISexPost)
+
+	getArticle()
+
 	scanner := bufio.NewScanner(os.Stdin)
 	quit := false
 
 	for !quit {
 		fmt.Println("n: Next, p: Previous, v: View, d: Download, q/quit/exit: Quit")
+		fmt.Printf("Dcard:%v> ", currForum)
 
 		if !scanner.Scan() {
 			break
