@@ -20,10 +20,15 @@ var (
 	currForum string
 )
 
-func getArticle() {
+func getArticle(lastID int) int {
 	var article Articles
+	url := dcardAPISexPost
 
-	resp, err := http.Get(dcardAPISexPost)
+	if lastID != 0 {
+		url = fmt.Sprintf("%s&before=%d", dcardAPISexPost, lastID)
+	}
+
+	resp, err := http.Get(url)
 	if err != nil || resp.StatusCode != http.StatusOK {
 		log.Fatalln(err)
 		log.Fatalln(resp.Status)
@@ -40,14 +45,17 @@ func getArticle() {
 
 	for _, v := range article {
 		fmt.Printf("[%v](%v) -> %v: %v\n", v.ID, v.CreatedAt, len(v.Media), v.Title)
+		lastID = v.ID
 	}
+
+	return lastID
 }
 
 func main() {
 	currForum = "sex"
 	log.Printf("Forum: %v, URL: %v\n", currForum, dcardAPISexPost)
 
-	getArticle()
+	lastID := getArticle(0)
 
 	scanner := bufio.NewScanner(os.Stdin)
 	quit := false
@@ -70,6 +78,7 @@ func main() {
 			quit = true
 		case "n":
 			fmt.Println("Next Page")
+			lastID = getArticle(lastID)
 		case "p":
 			fmt.Println("Previous Page")
 		case "v":
