@@ -4,12 +4,15 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 const (
@@ -21,6 +24,8 @@ const (
 var (
 	dcardAPIPostMeta string
 	currForum        string
+	dlPath           string
+	numOfWorker      int
 )
 
 func getForums() string {
@@ -57,8 +62,8 @@ func getForums() string {
 	return forum[forumID].Alias
 }
 
-func getPostMeta(firstID int, lastID int) (int, int, PostMeta) {
-	var postMeta PostMeta
+func getPostMeta(firstID int, lastID int) (int, int, PostMetas) {
+	var postMeta PostMetas
 	url := dcardAPIPostMeta
 
 	if firstID != 0 {
@@ -85,7 +90,7 @@ func getPostMeta(firstID int, lastID int) (int, int, PostMeta) {
 	}
 
 	for k, v := range postMeta {
-		fmt.Printf("[%v](%v) -> %v: %v\n", k, v.CreatedAt, len(v.Media), v.Title)
+		fmt.Printf("[#%v] %v pics (%v): %v\n", k, len(v.Media), v.CreatedAt, v.Title)
 
 		if firstID == 0 {
 			firstID = v.ID
@@ -123,7 +128,62 @@ func getPost(postID int) {
 	fmt.Println("========================================")
 }
 
+func getPostMedia(postMeta PostMeta) {
+	var wg sync.WaitGroup
+	ch := make(chan string)
+	destDir := fmt.Sprintf("%v/%v/%v_%v", dlPath, postMeta.ForumAlias, postMeta.ID, postMeta.Title)
+
+	for i := 0; i < numOfWorker; i++ {
+		wg.Add(1)
+		go downloadWorker(&wg, ch, destDir)
+	}
+
+	for _, v := range postMeta.Media {
+		ch <- v.URL
+	}
+}
+
+func downloadWorker(wg *sync.WaitGroup, ch chan string, destDir string) {
+	defer wg.Done()
+
+	for dlURL := range ch {
+		slURL := strings.Split(dlURL, "/")
+		fileName := slURL[len(slURL)-1]
+		log.Printf("Get %v from %v", fileName, dlURL)
+
+		resp, err := http.Get(dlURL)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		defer resp.Body.Close()
+
+		if err := os.MkdirAll(destDir, 0755); err != nil {
+			log.Println(err)
+			continue
+		}
+
+		f, err := os.Create(filepath.Join(destDir, fileName))
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+
+		_, err = io.Copy(f, resp.Body)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+
+		f.Close()
+	}
+}
+
 func main() {
+	numOfWorker = 1
+	homeDir := os.Getenv("HOME")
+	dlPath = fmt.Sprintf("%v/%v/%v", homeDir, "Downloads", "ILoveDcard")
+
 	currForum := getForums()
 	firstID, lastID, postMeta := getPostMeta(0, 0)
 
@@ -178,6 +238,21 @@ func main() {
 			if len(args) == 0 {
 				fmt.Println("No post specified. Try input 'd 1' to get media file")
 				continue
+			}
+
+			for _, v := range args {
+				i, err := strconv.Atoi(v)
+				if err != nil {
+					fmt.Println(err)
+					continue
+				}
+
+				if i > len(postMeta) || i < 0 {
+					fmt.Println("Not a valid post ID. Try input 'v 1' to view article")
+					continue
+				}
+
+				getPostMedia(postMeta[i])
 			}
 
 			fmt.Printf("Download post media: %v\n", args)
