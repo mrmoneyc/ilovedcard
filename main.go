@@ -125,7 +125,7 @@ func getPost(postID int) {
 	fmt.Printf("Title: %v\n", post.Title)
 	fmt.Println("========================================")
 	fmt.Printf("Content: \n%v\n", post.Content)
-	fmt.Println("========================================")
+	fmt.Printf("(%v Comments)\n", post.CommentCount)
 }
 
 func getPostMedia(postMeta PostMeta) {
@@ -140,6 +140,41 @@ func getPostMedia(postMeta PostMeta) {
 
 	for _, v := range postMeta.Media {
 		ch <- v.URL
+	}
+}
+
+func showComments(postID int) {
+	var comments Comments
+	url := fmt.Sprintf("%s/%d/comments", dcardAPIPost, postID)
+
+	resp, err := http.Get(url)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		log.Fatalln(err)
+		log.Fatalln(resp.Status)
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	if err := json.Unmarshal([]byte(body), &comments); err != nil {
+		log.Fatalln(err)
+	}
+
+	fmt.Println("---------------------------------------------------------")
+	for index, comment := range comments {
+		userDescription := fmt.Sprintf("%v%v", comment.School, comment.Department)
+		if comment.Anonymous {
+			userDescription = "匿名"
+		}
+		genderDescription := "男"
+		if comment.Gender == "F" {
+			genderDescription = "女"
+		}
+		fmt.Printf("B%v %v(%v):\n\n%v \n", index+1, userDescription, genderDescription, comment.Content)
+		fmt.Println("---------------------------------------------------------")
 	}
 }
 
@@ -233,7 +268,9 @@ func main() {
 				continue
 			}
 
-			getPost(postMeta[i].ID)
+			postID := postMeta[i].ID
+			getPost(postID)
+			showComments(postID)
 		case "d":
 			if len(args) == 0 {
 				fmt.Println("No post specified. Try input 'd 1' to get media file")

@@ -80,3 +80,24 @@ type Post struct {
 		URL string `json:"url"`
 	} `json:"media"`
 }
+
+// Comment response data structure
+type Comments []struct {
+	ID             string `json:"id"`
+	Anonymous      bool   `json:"anonymous"`
+	PostID         int    `json:"postId"`
+	CreatedAt      string `json:"createdAt"`
+	UpdatedAt      string `json:"updatedAt"`
+	Floor          int    `json:"floor"`
+	Content        string `json:"content"`
+	LikeCount      int    `json:"likeCount"`
+	WithNickname   bool   `json:"withNickname"`
+	HiddenByAuthor bool   `json:"hiddenByAuthor"`
+	Gender         string `json:"gender"`
+	School         string `json:"school"`
+	Department     string `json:"department"`
+	Host           bool   `json:"host"`
+	ReportReason   string `json:"reportReason"`
+	Hidden         bool   `json:"hidden"`
+	InReview       bool   `json:"inReview"`
+}
